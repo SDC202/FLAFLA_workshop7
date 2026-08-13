@@ -61,7 +61,14 @@ def test_calculate_total_aplica_iva():
 #   - `calculate_total(100.0, 0)` y `calculate_total(100.0, -1)` deben lanzar
 #     `ValueError`. Usa `with pytest.raises(ValueError): ...`.
 def test_calculate_total_cantidad_invalida():
-    pytest.skip("TODO pendiente: completa este test (Integrante responsable).")
+    """Las cantidades 0 y -1 deben lanzar ValueError."""
+    service, _, _ = make_service()
+    # Caso con cantidad 0
+    with pytest.raises(ValueError):
+        service.calculate_total(unit_price=100.0, quantity=0)
+    # Caso con cantidad -1
+    with pytest.raises(ValueError):
+        service.calculate_total(unit_price=100.0, quantity=-1)
 
 
 # TODO 2: Stock insuficiente.
@@ -70,7 +77,14 @@ def test_calculate_total_cantidad_invalida():
 #   - EXTRA: verifica que NUNCA se intentó cobrar
 #     (`gateway.charge.assert_not_called()`).
 def test_place_order_sin_stock():
-    pytest.skip("TODO pendiente: completa este test (Integrante responsable).")
+    """Debe fallar por falta de stock y no intentar realizar el cobro."""
+    service, _, gateway = make_service(stock=1)
+
+    with pytest.raises(OutOfStockError):
+        service.place_order(product_id="PROD-001", quantity=5, card_token="tok_test")
+
+    gateway.charge.assert_not_called()
+    
 
 
 # TODO 3: Pago rechazado.
@@ -78,7 +92,13 @@ def test_place_order_sin_stock():
 #   - `place_order(...)` debe lanzar `PaymentRejectedError`.
 #   - EXTRA: verifica que el pedido NO se guardó (`db.save_order.assert_not_called()`).
 def test_place_order_pago_rechazado():
-    pytest.skip("TODO pendiente: completa este test (Integrante responsable).")
+    """Configura el servicio con approved=False."""
+    service, db, _ = make_service(approved=False)
+    
+    with pytest.raises(PaymentRejectedError):
+        service.place_order(product_id="PROD-002", quantity=2, card_token="tok_fail")
+        
+    db.save_order.assert_not_called()
 
 
 # TODO 4: Camino feliz completo.
@@ -87,4 +107,12 @@ def test_place_order_pago_rechazado():
 #   - Verifica que se descontó el stock:
 #     `db.update_stock` fue llamado con (product_id, stock - quantity).
 def test_place_order_confirmado_descuenta_stock():
-    pytest.skip("TODO pendiente: completa este test (Integrante responsable).")
+    """approved=True, stock suficiente. Verifica status, total e inventario."""
+    service, db, _ = make_service(stock=10, price=100.0, approved=True)
+    
+    resultado = service.place_order(product_id="PROD-003", quantity=2, card_token="tok_ok")
+    
+    assert resultado["status"] == "CONFIRMED"
+    assert resultado["total"] == 232.0  # (100 * 2) * 1.16
+    
+    db.update_stock.assert_called_once_with("PROD-003", 8)
